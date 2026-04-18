@@ -1,4 +1,4 @@
-# BetterPos — Architecture Overview
+# Peer2Pos — Architecture Overview
 
 ## Stack
 

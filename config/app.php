@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'BetterPos'),
+    'name' => env('APP_NAME', 'Peer2Pos'),
 
     'node_id' => env('NODE_ID'),
 

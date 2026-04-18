@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
         $admin = User::factory()->create([
             'name'     => 'Admin',
             'username' => 'admin',
-            'email'    => 'admin@betterpos.local',
+            'email'    => 'admin@peer2pos.local',
             'password' => bcrypt('admin123'),
         ]);
 

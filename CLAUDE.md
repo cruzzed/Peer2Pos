@@ -46,7 +46,7 @@ npm install && npm run dev
 # First-time setup
 cp .env.example .env
 php artisan key:generate
-# Edit .env: set DB_CONNECTION=mysql, DB_DATABASE=betterpos, NODE_ID=<uuid>, NODE_NAME="Terminal Name"
+# Edit .env: set DB_CONNECTION=mysql, DB_DATABASE=peer2pos, NODE_ID=<uuid>, NODE_NAME="Terminal Name"
 php artisan migrate
 php artisan db:seed   # admin / admin123
 
