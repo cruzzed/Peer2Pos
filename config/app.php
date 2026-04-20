@@ -19,6 +19,8 @@ return [
 
     'node_name' => env('NODE_NAME', 'Terminal'),
 
+    'workgroup_token' => env('WORKGROUP_TOKEN'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

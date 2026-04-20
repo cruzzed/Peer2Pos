@@ -11,6 +11,8 @@ This file guides Claude Code when working in this repository. Read the architect
 Kept in `.claude/architecture/`. Read these first when touching unfamiliar areas.
 
 - [`.claude/architecture/overview.md`](.claude/architecture/overview.md) — full system overview: schema, panels, POS logic, sync model
+- [`.claude/architecture/receipt-printing.md`](.claude/architecture/receipt-printing.md) — receipt printer & cash drawer integration: ESC/POS protocol, Web Serial, QZ Tray, mike42/escpos-php, architecture options
+- [`.claude/architecture/p2p-sync.md`](.claude/architecture/p2p-sync.md) — P2P workgroup join flow, auto-broadcast sync, loop protection, token auth, nested payloads — **planned, not yet implemented**
 
 ---
 

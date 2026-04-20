@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,11 +16,13 @@ class Node extends Model
         'url',
         'is_self',
         'last_seen_at',
+        'joined_at',
     ];
 
     protected $casts = [
         'is_self' => 'boolean',
         'last_seen_at' => 'datetime',
+        'joined_at' => 'datetime',
     ];
 
     public function syncStatuses(): HasMany
@@ -32,7 +35,7 @@ class Node extends Model
         return static::where('is_self', true)->first();
     }
 
-    public static function peers(): \Illuminate\Database\Eloquent\Collection
+    public static function peers(): Collection
     {
         return static::where('is_self', false)->get();
     }
