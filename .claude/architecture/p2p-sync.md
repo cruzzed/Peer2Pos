@@ -1,7 +1,7 @@
 # Peer2Pos — P2P Workgroup & Sync Architecture
 
-> Design document. Written: 2026-04-19.
-> Status: **Planned — not yet implemented.**
+> Design document. Written: 2026-04-19. Last updated: 2026-04-20.
+> Status: **Implemented.**
 
 ---
 
@@ -18,23 +18,41 @@ Key design decisions:
 
 ---
 
-## Workgroup Join Flow
+## Workgroup Join Flow (Full-Mesh Handshake)
+
+Any node can be the entry point. When Node B joins by contacting Node A:
 
 ```
-Node B (joining)                         Node A (existing member)
-─────────────────────────────────────────────────────────────────
+Node B (joining)              Node A (entry point)        Node C, D, ... (existing)
+──────────────────────────────────────────────────────────────────────────────────
 POST /api/sync/join
-  { node_id, node_name, node_url,   →   Validate workgroup_token
-    workgroup_token }                    Upsert Node B into nodes table
-                                         Return { node: self, peers: [...] }
-                                    ←
-Register Node A + all returned peers
-seedPendingForPeer(Node A)               ← marks all existing records pending for A
-dispatch(SnapshotPullJob)                ← B will pull A's full dataset
-dispatch(PushSyncJob)                    ← B will push its own data to A
+  { node_id, node_name,  →   Validate token
+    node_url, token }         Upsert Node B
+                              seedPendingForPeer(B)
+                              PushSyncJob::dispatch()     ← A will push its data to B
+                              Return { node: A, peers: [C, D, ...] }
+                         ←
+
+Register A + all peers (C, D ...)
+
+── Full-mesh announce: POST /api/sync/join to C, D, ... ──
+                              (each peer)
+                                  Validate token          →  Upsert Node B
+                                                             seedPendingForPeer(B)
+                                                             PushSyncJob::dispatch()  ← C/D push to B
+
+seedPendingForPeer(A, C, D, ...)   ← mark all local records pending for every peer
+SnapshotPullJob::dispatch(A)       ← pull A's full dataset (A has workgroup state)
+PushSyncJob::dispatch()            ← push B's own data to A, C, D, ...
 ```
 
-After both jobs complete, both nodes are fully in sync bidirectionally.
+After all jobs drain from the queue, every node holds the complete merged dataset.
+
+**Key properties:**
+- Node B announces itself to every existing member, not just the entry point
+- Every existing member independently seeds + pushes to Node B upon receiving the announcement
+- Pulling snapshot from only the entry point is sufficient — it already has the full workgroup state
+- Offline peers will receive data on next scheduled `syncAll()` run or when they come back and process their queue
 
 ---
 
@@ -304,11 +322,13 @@ Schedule::call(function () {
 
 1. Admin fills: Peer URL + Workgroup Token (masked)
 2. `POST {peer_url}/api/sync/join` with local node identity + token
-3. On success: register peer (using `id` from response `node`) + all returned peers
-4. `SyncService::seedPendingForPeer($peer)` — creates pending rows for our existing data
-5. `SnapshotPullJob::dispatch($peerUrl)` — queue pull of peer's data
-6. `PushSyncJob::dispatch()` — queue push of our data to peer
-7. Success notification: "Joined workgroup. Initial sync dispatched."
+3. On success: register entry-point peer + all other peers returned in `peers[]`
+4. Loop through `peers[]` and POST `/api/sync/join` to each — full-mesh announce
+   - Each existing peer will `seedPendingForPeer` + `PushSyncJob::dispatch()` for us
+5. `SyncService::seedPendingForPeer($peer)` for **every** known peer — marks our data pending for all
+6. `SnapshotPullJob::dispatch($peerUrl)` — pull full workgroup snapshot from entry-point
+7. `PushSyncJob::dispatch()` — push our data to all peers
+8. Success notification: "Joined workgroup. Initial sync dispatched."
 
 ---
 

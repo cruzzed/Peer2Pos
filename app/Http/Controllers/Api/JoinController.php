@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\PushSyncJob;
 use App\Models\Node;
+use App\Services\SyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class JoinController extends Controller
 {
-    public function join(Request $request): JsonResponse
+    public function join(Request $request, SyncService $syncService): JsonResponse
     {
         $request->validate([
             'node_id' => 'required|uuid',
@@ -33,7 +35,14 @@ class JoinController extends Controller
             'last_seen_at' => now(),
         ])->save();
 
+        // Seed pending rows for all our existing records targeting the joining node,
+        // then dispatch a push so this node sends its full dataset to the new member.
+        $syncService->seedPendingForPeer($node);
+        PushSyncJob::dispatch();
+
+        // Return our identity + all known peers (excluding the joining node itself)
         $peers = Node::where('is_self', false)
+            ->where('id', '!=', $node->id)
             ->get(['id', 'name', 'url', 'joined_at'])
             ->toArray();
 

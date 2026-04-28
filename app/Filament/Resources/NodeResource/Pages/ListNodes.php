@@ -59,7 +59,7 @@ class ListNodes extends ListRecords
 
                     $payload = $response->json();
 
-                    // Register the peer we joined using the identity it returned
+                    // Register the entry-point peer using the identity it returned
                     $peerNode = Node::firstOrNew(['url' => $peerUrl]);
                     $peerNode->forceFill([
                         'id' => $payload['node']['id'],
@@ -70,12 +70,8 @@ class ListNodes extends ListRecords
                         'last_seen_at' => now(),
                     ])->save();
 
-                    // Register any additional peers the joined node knows about
+                    // Register all other peers the entry-point returned
                     foreach ($payload['peers'] ?? [] as $peer) {
-                        if (rtrim($peer['url'], '/') === $peerUrl) {
-                            continue; // already registered above
-                        }
-
                         $node = Node::firstOrNew(['url' => rtrim($peer['url'], '/')]);
                         $node->forceFill([
                             'id' => $peer['id'],
@@ -85,11 +81,28 @@ class ListNodes extends ListRecords
                         ])->save();
                     }
 
-                    // Seed pending rows for our existing data so it gets pushed to the new peer
-                    app(SyncService::class)->seedPendingForPeer($peerNode);
+                    // Full-mesh handshake: announce ourselves to every other known peer
+                    // so they each register us and will push their data back to us.
+                    $otherPeers = collect($payload['peers'] ?? []);
+                    foreach ($otherPeers as $peer) {
+                        Http::timeout(10)->post(rtrim($peer['url'], '/').'/api/sync/join', [
+                            'node_id' => config('app.node_id'),
+                            'node_name' => config('app.node_name'),
+                            'node_url' => config('app.url'),
+                            'workgroup_token' => $data['workgroup_token'],
+                        ]);
+                        // Ignore failures — offline peers will be reached when they come back online
+                    }
 
-                    // Queue the bidirectional initial sync
+                    // Seed pending rows for all peers so our existing data gets pushed to everyone
+                    $syncService = app(SyncService::class);
+                    foreach (Node::peers() as $knownPeer) {
+                        $syncService->seedPendingForPeer($knownPeer);
+                    }
+
+                    // Pull the full workgroup snapshot from the entry-point (it has everyone's data)
                     SnapshotPullJob::dispatch($peerUrl);
+                    // Push our own data to all known peers
                     PushSyncJob::dispatch();
 
                     Notification::make()
